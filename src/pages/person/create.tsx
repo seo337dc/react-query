@@ -26,7 +26,8 @@ interface ICreatePersonParams {
 
 // 다른 것을 전달하는 용
 interface IContext {
-  id: string;
+  // id: string;
+  previousPerson: IPerson | undefined;
 }
 
 function Create() {
@@ -37,10 +38,23 @@ function Create() {
   const mutaion = useMutation<IPerson, Error, ICreatePersonParams, IContext | undefined>(
     async ({ id, name, age }) => createPerson(id, name, age),
     {
-      // befor mutation
-      onMutate: (variables: ICreatePersonParams) => {
-        console.log('mutation variable', variables);
-        return { id: '7' };
+      // befor IContext
+      onMutate: async (_variables: ICreatePersonParams) => {
+        await queryClient.cancelQueries(['person']); // 기존 실행 취소
+
+        // console.log('mutation variable', variables);
+        // return { id: '7' };
+        const previousPerson: IPerson | undefined = queryClient.getQueryData(['person']); // 기존 데이터는 캐싱에서 가지고 옴
+
+        const newTodo: IPerson = {
+          id: '123',
+          age: 200,
+          name: 'Lebron James',
+        };
+
+        queryClient.setQueryData(['person'], newTodo); // 새로운 파라메터로 따로 실행
+
+        return { previousPerson };
       },
       onSuccess: (data: IPerson, _variables: ICreatePersonParams, _context: IContext | undefined) => {
         queryClient.invalidateQueries(['person']);
@@ -50,7 +64,8 @@ function Create() {
 
       onError: (error: Error, _variables: ICreatePersonParams, context: IContext | undefined) => {
         console.log('error: ', error.message);
-        return console.log('rolling back optimistic update with id : ', context?.id);
+        queryClient.setQueryData(['person'], context?.previousPerson);
+        return console.log('rolling back optimistic update with id : ', context?.previousPerson?.id);
       },
 
       // on matter if error or success run me
